@@ -1,4 +1,4 @@
-// index.js (Subscription Bot - Final Version)
+// index.js (Subscription Bot - Final Version з виправленням)
 
 require('dotenv').config();
 process.env.TZ = process.env.TZ || 'UTC'; // Встановлюємо часовий пояс UTC
@@ -18,8 +18,6 @@ const dbConnectionString = process.env.DB_CONNECTION_STRING;
 const port = process.env.PORT || 8080; 
 const webhookPath = '/bot/' + token; 
 
-// "Тимчасова пам'ять" для процесу підписки
-// (Це НАДІЙНИЙ метод, кращий за bot.once)
 const userStates = {};
 
 // --- 2. ПІДКЛЮЧЕННЯ ДО БД ---
@@ -33,7 +31,6 @@ mongoose.connect(dbConnectionString)
   });
 
 // --- 3. ФУНКЦІЇ API (Погода) ---
-// (Ті самі, що й у минулому завданні)
 async function getWeather(lat, lon) {
     if (!weatherApiKey) {
         logger.error("OPENWEATHER_API_KEY не встановлено.");
@@ -76,6 +73,7 @@ app.post(webhookPath, (req, res) => {
 // --- 5. "БУДИЛЬНИК" (CRON JOB) ---
 logger.info('Cron job scheduler started. Will check every minute.');
 cron.schedule('* * * * *', async () => {
+    // ... (код Cron залишається без змін) ...
     const now = new Date();
     const currentTimeUTC = now.toISOString().substring(11, 16); 
     logger.info(`Cron tick: ${currentTimeUTC} UTC. Checking...`);
@@ -109,6 +107,7 @@ cron.schedule('* * * * *', async () => {
 
 // /start
 bot.onText(/\/start/, (msg) => {
+    // ... (код /start залишається без змін) ...
     const chatId = msg.chat.id;
     bot.sendMessage(chatId, 
         "👋 Вітаю! Я бот для підписки на погоду.\n\n" +
@@ -122,6 +121,7 @@ bot.onText(/\/start/, (msg) => {
 
 // /unsubscribe
 bot.onText(/\/unsubscribe/, async (msg) => {
+    // ... (код /unsubscribe залишається без змін) ...
     const chatId = msg.chat.id;
     try {
         const deleted = await Subscription.findOneAndDelete({ chatId: chatId });
@@ -131,15 +131,16 @@ bot.onText(/\/unsubscribe/, async (msg) => {
         } else {
             bot.sendMessage(chatId, "Ви ще не були підписані.");
         }
-        delete userStates[chatId]; // Очищуємо стан
+        delete userStates[chatId]; 
     } catch (error) {
         logger.error({ chatId, error: error.message }, "Unsubscribe failed.");
         bot.sendMessage(chatId, "Не вдалося скасувати підписку. Спробуйте ще раз.");
     }
 });
 
-// ⭐ --- НОВА КОМАНДА /list --- ⭐
+// /list
 bot.onText(/\/list/, async (msg) => {
+    // ... (код /list залишається без змін) ...
     const chatId = msg.chat.id;
     try {
         const subs = await Subscription.find({ chatId: chatId, isActive: true });
@@ -149,9 +150,7 @@ bot.onText(/\/list/, async (msg) => {
         }
 
         let text = "📋 Ваші активні підписки:\n\n";
-        // (Хоча у нас логіка "одна підписка на 1 юзера", зробимо через цикл)
         for (const sub of subs) {
-            // Отримаємо назву міста (додатковий запит до API)
             const weather = await getWeather(sub.location.latitude, sub.location.longitude);
             text += `📍 *Місто:* ${weather.name}\n`;
             text += `⏰ *Час (UTC):* ${sub.notificationTime}\n\n`;
@@ -166,8 +165,9 @@ bot.onText(/\/list/, async (msg) => {
 });
 
 
-// /subscribe (Початок покрокової розмови)
+// /subscribe
 bot.onText(/\/subscribe/, async (msg) => {
+    // ... (код /subscribe залишається без змін) ...
     const chatId = msg.chat.id;
     const existingSub = await Subscription.findOne({ chatId: chatId });
     if (existingSub && existingSub.isActive) {
@@ -195,17 +195,37 @@ bot.on('location', async (msg) => {
     }
 });
 
+// --- ⭐ ВИПРАВЛЕНИЙ ОБРОБНИК ТЕКСТУ ⭐ ---
 // Обробник текстових повідомлень (Крок 3 підписки)
 bot.on('message', async (msg) => {
     const chatId = msg.chat.id;
     const text = msg.text;
 
-    // Ігноруємо, якщо це не відповідь на наш покроковий діалог
-    if (!userStates[chatId] || text.startsWith('/') || msg.location) {
+    // --- ПОЧАТОК ВИПРАВЛЕННЯ ---
+
+    // 1. Ігноруємо, якщо це НЕ текст (наприклад, геолокація, фото)
+    //    Це виправляє помилку 'undefined.startsWith'
+    if (!text) {
         return;
     }
 
+    // 2. Ігноруємо команди (їх обробляють onText)
+    if (text.startsWith('/')) {
+        return;
+    }
+    
+    // 3. Ігноруємо, якщо ми не очікуємо відповіді від цього юзера
+    if (!userStates[chatId] || !userStates[chatId].state) {
+        // Можна надіслати допомогу, якщо юзер пише просто так
+        // bot.sendMessage(chatId, "Я не розумію. Використовуйте /start для допомоги.");
+        return;
+    }
+    // --- КІНЕЦЬ ВИПРАВЛЕННЯ ---
+
+    // Тепер ми впевнені, що 'text' існує і це не команда.
+    // Перевіряємо, чи ми очікуємо час
     if (userStates[chatId].state === 'awaiting_time') {
+        
         // Валідація часу
         if (!/^\d{2}:\d{2}$/.test(text)) {
             bot.sendMessage(chatId, "❌ Неправильний формат. Спробуйте ще раз (наприклад, `09:00`).");
