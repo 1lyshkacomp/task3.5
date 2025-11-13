@@ -195,40 +195,40 @@ bot.on('location', async (msg) => {
     }
 });
 
-// --- ⭐ ВИПРАВЛЕНИЙ ОБРОБНИК ТЕКСТУ ⭐ ---
-// Обробник текстових повідомлень (Крок 3 підписки)
+// --- ⭐ ИСПРАВЛЕННЫЙ ОБРАБОТЧИК ТЕКСТА ⭐ ---
+// Обработчик текстовых сообщений (Шаг 3 подписки)
 bot.on('message', async (msg) => {
     const chatId = msg.chat.id;
     const text = msg.text;
 
-    // --- ПОЧАТОК ВИПРАВЛЕННЯ ---
+    // --- НАЧАЛО ИСПРАВЛЕНИЯ ---
 
-    // 1. Ігноруємо, якщо це НЕ текст (наприклад, геолокація, фото)
-    //    Це виправляє помилку 'undefined.startsWith'
+    // 1. Игнорируем, если это НЕ текст (например, геолокация, фото)
+    //    Это исправляет ошибку 'undefined.startsWith'
     if (!text) {
         return;
     }
 
-    // 2. Ігноруємо команди (їх обробляють onText)
+    // 2. Игнорируем команды (их обрабатывают onText)
     if (text.startsWith('/')) {
         return;
     }
     
-    // 3. Ігноруємо, якщо ми не очікуємо відповіді від цього юзера
+    // 3. Игнорируем, если мы не ожидаем ответа от этого юзера
     if (!userStates[chatId] || !userStates[chatId].state) {
-        // Можна надіслати допомогу, якщо юзер пише просто так
-        // bot.sendMessage(chatId, "Я не розумію. Використовуйте /start для допомоги.");
+        // Можно отправить помощь, если юзер пишет просто так
+        // bot.sendMessage(chatId, "Я не понимаю. Используйте /start для помощи.");
         return;
     }
-    // --- КІНЕЦЬ ВИПРАВЛЕННЯ ---
+    // --- КОНЕЦ ИСПРАВЛЕНИЯ ---
 
-    // Тепер ми впевнені, що 'text' існує і це не команда.
-    // Перевіряємо, чи ми очікуємо час
+    // Теперь мы уверены, что 'text' существует и это не команда.
+    // Проверяем, ожидаем ли мы время
     if (userStates[chatId].state === 'awaiting_time') {
         
-        // Валідація часу
+        // Валидация времени
         if (!/^\d{2}:\d{2}$/.test(text)) {
-            bot.sendMessage(chatId, "❌ Неправильний формат. Спробуйте ще раз (наприклад, `09:00`).");
+            bot.sendMessage(chatId, "❌ Неправильный формат. Попробуйте еще раз (например, `09:00`).", { parse_mode: 'Markdown' });
             return;
         }
 
@@ -248,17 +248,17 @@ bot.on('message', async (msg) => {
                     notificationTime: notificationTime,
                     isActive: true
                 },
-                { upsert: true, new: true } // Створити, якщо не знайдено
+                { upsert: true, new: true } // Создать, если не найдено
             );
 
             logger.info({ chatId, time: notificationTime }, "Subscription successful!");
-            bot.sendMessage(chatId, `✅ Готово! Ви підписані на щоденний прогноз погоди о ${notificationTime} UTC.`);
+            bot.sendMessage(chatId, `✅ Готово! Вы подписаны на ежедневный прогноз погоды в ${notificationTime} UTC.`, { parse_mode: 'Markdown' });
 
         } catch (error) {
             logger.error({ chatId, error: error.message }, "Failed to save subscription.");
-            bot.sendMessage(chatId, "Ой, сталася помилка бази даних. Спробуйте /subscribe ще раз.");
+            bot.sendMessage(chatId, "Ой, произошла ошибка базы данных. Попробуйте /subscribe еще раз.");
         } finally {
-            delete userStates[chatId]; // Очищуємо стан
+            delete userStates[chatId]; // Очищаем состояние
         }
     }
 });
